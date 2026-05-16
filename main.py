@@ -17,32 +17,51 @@ model = genai.GenerativeModel(
 )
 
 def haber_verilerini_getir(hisse_kodu: str):
-    """(Bu kısım aynı: Önce Yahoo, çökerse Google News)"""
+    """
+    Hem Amerikan hem de Türk (BİST) hisselerini otomatik tanır.
+    Hem İngilizce hem Türkçe haber araması yapar.
+    """
     haber_basliklari = []
+    hisse_kodu = hisse_kodu.upper()
     
-    try:
-        hisse = yf.Ticker(hisse_kodu)
-        haberler = hisse.news
-        if haberler:
-            return [haber['title'] for haber in haberler]
-    except Exception:
-        pass 
-
-    try:
-        url = f"https://news.google.com/rss/search?q={hisse_kodu}+stock+news&hl=en-US&gl=US&ceid=US:en"
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req) as response:
-            xml_data = response.read()
+    kodlar_denenecek = [hisse_kodu]
+    if not hisse_kodu.endswith(".IS"):
+        kodlar_denenecek.append(f"{hisse_kodu}.IS")
         
-        root = ET.fromstring(xml_data)
-        for item in root.findall('.//item'):
-            haber_basliklari.append(item.find('title').text)
-            if len(haber_basliklari) >= 15:
-                break
-        return haber_basliklari
-    except Exception as e:
-        print(f"Haber çekilirken hata: {e}")
-        return []
+    for kod in kodlar_denenecek:
+        try:
+            hisse = yf.Ticker(kod)
+            haberler = hisse.news
+            if haberler:
+                return [haber['title'] for haber in haberler]
+        except Exception:
+            continue 
+
+    aramalar = [
+        (f"{hisse_kodu}+hisse+haber", "hl=tr&gl=TR&ceid=TR:tr"), 
+        (f"{hisse_kodu}+stock+news", "hl=en-US&gl=US&ceid=US:en") 
+    ]
+    
+    for sorgu, dil_ayari in aramalar:
+        try:
+            url = f"https://news.google.com/rss/search?q={sorgu}&{dil_ayari}"
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            
+            with urllib.request.urlopen(req) as response:
+                xml_data = response.read()
+            
+            root = ET.fromstring(xml_data)
+            for item in root.findall('.//item'):
+                haber_basliklari.append(item.find('title').text)
+                if len(haber_basliklari) >= 15:
+                    break
+            
+            if haber_basliklari:
+                return haber_basliklari
+        except Exception:
+            continue
+            
+    return []
 
 @app.get("/analiz/{hisse_kodu}")
 async def hisse_analiz_et(hisse_kodu: str):
