@@ -5,10 +5,11 @@ import urllib.request
 import xml.etree.ElementTree as ET
 import google.generativeai as genai
 import json
+import os
 
 app = FastAPI(title="Gemini Destekli Finansal Analiz API")
 
-GOOGLE_API_KEY = "AIzaSyCJYrBExMl5U7B8jmj4V0t_-IC44uBz3S8" 
+GOOGLE_API_KEY = os.getenv("GEMINI_API_KEY")
 genai.configure(api_key=GOOGLE_API_KEY)
 
 model = genai.GenerativeModel(
